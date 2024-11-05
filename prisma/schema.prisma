@@ -1,0 +1,151 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  avatar          String?
+  emailVerified   Boolean   @default(false)
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  sessions        Session[]
+  keys           Key[]
+  organizations  OrganizationMember[]
+  backupCodes    BackupCode[]
+  verificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model Session {
+  id            String    @id @unique
+  userId        String
+  user          User      @relation(references: [id], fields: [userId], onDelete: Cascade)
+  expiresAt     DateTime
+  lastUsed      DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  userAgent     String?
+  ipAddress     String?
+  deviceType    String?   // "mobile" | "tablet" | "desktop"
+  browser       String?
+  os            String?
+  lastLocation  String?   // City, Country
+  isRevoked     Boolean   @default(false)
+  revokedAt     DateTime?
+  revokedReason String?   // "user_logout" | "admin_action" | "security_concern"
+
+  @@index([userId])
+  @@index([lastUsed])
+  @@index([isRevoked])
+}
+
+model Key {
+  id              String  @id @default(cuid())
+  hashed_password String?
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String  @unique
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   OrganizationMember[]
+  jobs      JobPosting[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  role           String       @default("member") // "owner" | "admin" | "member"
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model JobPosting {
+  id               String       @id @default(cuid())
+  title            String
+  description      String
+  location         String
+  type             String       // "full-time" | "part-time" | "contract" | "internship"
+  department       String
+  salaryMin        Float?
+  salaryMax        Float?
+  salaryCurrency   String?
+  requirements     String[]
+  responsibilities String[]
+  status           String       @default("draft") // "draft" | "published" | "closed"
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId   String
+  createdBy        String
+
+  @@index([organizationId])
+}
+
+model BackupCode {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code          String
+  used          Boolean   @default(false)
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
+  useLocation   String?   // City, Country where the code was used
+  useDevice     String?   // Device information when used
+  useIpAddress  String?   // IP address when used
+  useBrowser    String?   // Browser information when used
+  useUserAgent  String?   // User agent when used
+  invalidated   Boolean   @default(false)
+  invalidatedAt DateTime?
+  invalidatedReason String? // "expired" | "user_request" | "security_policy"
+  replacedBy    String?   // ID of the new backup code if replaced
+  batchId       String?   // Group ID for backup codes generated together
+
+  @@index([userId])
+  @@index([used])
+  @@index([invalidated])
+  @@index([batchId])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+
+  @@index([userId])
+}
